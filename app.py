@@ -43,7 +43,7 @@ def load_model():
     if not os.path.exists(BEST_MODEL_PATH):
         raise FileNotFoundError(f"Model not found: {BEST_MODEL_PATH}")
     
-    checkpoint = torch.load(BEST_MODEL_PATH, map_location=device)
+    checkpoint = torch.load(BEST_MODEL_PATH, map_location=device, weights_only=False)
     num_classes = checkpoint.get('num_classes', 345)
     categories = checkpoint.get('categories', CATEGORIES[:num_classes])
     model_type = checkpoint.get('model_type', 'base')
