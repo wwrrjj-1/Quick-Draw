@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quick Draw - AI 涂鸦识别</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        body {
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        /* 顶部标题 */
+        .header {
+            text-align: center;
+            color: white;
+            flex-shrink: 0;
+            margin-bottom: 8px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+            align-items: center;
+            background: rgba(255,255,255,0.15);
+            padding: 8px 12px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:active {
+            transform: scale(0.92);
+        }
+
+        .tool-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .size-slider {
+            width: 80px;
+            height: 6px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .size-label {
+            color: white;
+            font-size: 12px;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        /* 画板区域 */
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 360px;
+            min-height: 0;
+        }
+
+        .canvas-wrapper {
+            background: white;
+            border-radius: 20px;
+            padding: 6px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.3);
+            width: 100%;
+            aspect-ratio: 1;
+            max-height: 100%;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 14px;
+            background: white;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        #canvas.eraser-mode {
+            cursor: cell;
+        }
+
+        /* 结果区域 - 固定高度 */
+        .results {
+            width: 100%;
+            max-width: 360px;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 12px;
+            flex-shrink: 0;
+            height: 160px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .results-title {
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            color: white;
+        }
+
+        .result-rank {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .result-item:first-child .result-rank {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #333;
+        }
+
+        .result-item:nth-child(2) .result-rank {
+            background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+            color: #333;
+        }
+
+        .result-item:nth-child(3) .result-rank {
+            background: linear-gradient(135deg, #cd7f32, #b8860b);
+            color: #fff;
+        }
+
+        .result-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-bar {
+            width: 60px;
+            height: 5px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            margin: 0 10px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .result-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fff, rgba(255,255,255,0.7));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .result-conf {
+            font-size: 12px;
+            opacity: 0.9;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .placeholder {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            padding: 40px 0;
+        }
+
+        /* 按钮区域 */
+        .buttons {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 360px;
+            margin-top: 10px;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            flex: 1;
+            height: 48px;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-clear {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .btn-predict {
+            background: white;
+            color: #667eea;
+            flex: 2;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-predict:disabled {
+            opacity: 0.6;
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-predict.loading-state .loading {
+            display: block;
+        }
+
+        .btn-predict.loading-state .btn-text {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Quick Draw · AI 涂鸦识别</h1>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <button class="tool-btn active" id="penBtn" title="画笔">✏️</button>
+        <button class="tool-btn" id="eraserBtn" title="橡皮擦">🧽</button>
+        <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.3); margin: 0 4px;"></div>
+        <span class="size-label" id="sizeLabel">6</span>
+        <input type="range" class="size-slider" id="sizeSlider" min="2" max="20" value="6">
+    </div>
+
+    <div class="canvas-container">
+        <div class="canvas-wrapper">
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+
+    <div class="results" id="results">
+        <div class="placeholder">在上方画板绘画后点击识别</div>
+    </div>
+
+    <div class="buttons">
+        <button class="btn btn-clear" id="clearBtn">🗑️ 清除</button>
+        <button class="btn btn-predict" id="predictBtn">
+            <span class="btn-text">✨ 识别</span>
+            <div class="loading"></div>
+        </button>
+    </div>
+
+    <script>
+        // 完整 345 类别中英文映射
+        const categoryTranslations = {
+            'aircraft carrier': '航空母舰', 'airplane': '飞机', 'alarm clock': '闹钟',
+            'ambulance': '救护车', 'angel': '天使', 'animal migration': '动物迁徙',
+            'ant': '蚂蚁', 'anvil': '铁砧', 'apple': '苹果', 'arm': '手臂',
+            'asparagus': '芦笋', 'axe': '斧头', 'backpack': '背包', 'banana': '香蕉',
+            'bandage': '绷带', 'barn': '谷仓', 'baseball': '棒球', 'baseball bat': '棒球棒',
+            'basket': '篮子', 'basketball': '篮球', 'bat': '蝙蝠', 'bathtub': '浴缸',
+            'beach': '海滩', 'bear': '熊', 'beard': '胡子', 'bed': '床', 'bee': '蜜蜂',
+            'belt': '腰带', 'bench': '长凳', 'bicycle': '自行车', 'binoculars': '望远镜',
+            'bird': '鸟', 'birthday cake': '生日蛋糕', 'blackberry': '黑莓',
+            'blueberry': '蓝莓', 'book': '书', 'boomerang': '回旋镖', 'bottlecap': '瓶盖',
+            'bowtie': '蝴蝶结', 'bracelet': '手镯', 'brain': '大脑', 'bread': '面包',
+            'bridge': '桥', 'broccoli': '西兰花', 'broom': '扫帚', 'bucket': '水桶',
+            'bulldozer': '推土机', 'bus': '公交车', 'bush': '灌木', 'butterfly': '蝴蝶',
+            'cactus': '仙人掌', 'cake': '蛋糕', 'calculator': '计算器', 'calendar': '日历',
+            'camel': '骆驼', 'camera': '相机', 'camouflage': '迷彩', 'campfire': '篝火',
+            'candle': '蜡烛', 'cannon': '大炮', 'canoe': '独木舟', 'car': '汽车',
+            'carrot': '胡萝卜', 'castle': '城堡', 'cat': '猫', 'ceiling fan': '吊扇',
+            'cell phone': '手机', 'cello': '大提琴', 'chair': '椅子', 'chandelier': '吊灯',
+            'church': '教堂', 'circle': '圆形', 'clarinet': '单簧管', 'clock': '时钟',
+            'cloud': '云', 'coffee cup': '咖啡杯', 'compass': '指南针', 'computer': '电脑',
+            'cookie': '饼干', 'cooler': '冷藏箱', 'couch': '沙发', 'cow': '牛',
+            'crab': '螃蟹', 'crayon': '蜡笔', 'crocodile': '鳄鱼', 'crown': '皇冠',
+            'cruise ship': '游轮', 'cup': '杯子', 'diamond': '钻石', 'dishwasher': '洗碗机',
+            'diving board': '跳水板', 'dog': '狗', 'dolphin': '海豚', 'donut': '甜甜圈',
+            'door': '门', 'dragon': '龙', 'dresser': '梳妆台', 'drill': '电钻',
+            'drums': '鼓', 'duck': '鸭子', 'dumbbell': '哑铃', 'ear': '耳朵',
+            'elbow': '肘部', 'elephant': '大象', 'envelope': '信封', 'eraser': '橡皮擦',
+            'eye': '眼睛', 'eyeglasses': '眼镜', 'face': '脸', 'fan': '风扇',
+            'feather': '羽毛', 'fence': '栅栏', 'finger': '手指', 'fire hydrant': '消防栓',
+            'fireplace': '壁炉', 'firetruck': '消防车', 'fish': '鱼', 'flamingo': '火烈鸟',
+            'flashlight': '手电筒', 'flip flops': '人字拖', 'floor lamp': '落地灯',
+            'flower': '花', 'flying saucer': '飞碟', 'foot': '脚', 'fork': '叉子',
+            'frog': '青蛙', 'frying pan': '平底锅', 'garden': '花园', 'garden hose': '水管',
+            'giraffe': '长颈鹿', 'goatee': '山羊胡', 'golf club': '高尔夫球杆',
+            'grapes': '葡萄', 'grass': '草', 'guitar': '吉他', 'hamburger': '汉堡',
+            'hammer': '锤子', 'hand': '手', 'harp': '竖琴', 'hat': '帽子',
+            'headphones': '耳机', 'hedgehog': '刺猬', 'helicopter': '直升机',
+            'helmet': '头盔', 'hexagon': '六边形', 'hockey puck': '冰球',
+            'hockey stick': '曲棍球棒', 'horse': '马', 'hospital': '医院',
+            'hot air balloon': '热气球', 'hot dog': '热狗', 'hot tub': '热水浴缸',
+            'hourglass': '沙漏', 'house': '房子', 'house plant': '盆栽', 'hurricane': '飓风',
+            'ice cream': '冰淇淋', 'jacket': '夹克', 'jail': '监狱', 'kangaroo': '袋鼠',
+            'key': '钥匙', 'keyboard': '键盘', 'knee': '膝盖', 'knife': '刀',
+            'ladder': '梯子', 'lantern': '灯笼', 'laptop': '笔记本电脑', 'leaf': '叶子',
+            'leg': '腿', 'light bulb': '灯泡', 'lighter': '打火机', 'lighthouse': '灯塔',
+            'lightning': '闪电', 'line': '线条', 'lion': '狮子', 'lipstick': '口红',
+            'lobster': '龙虾', 'lollipop': '棒棒糖', 'mailbox': '邮箱', 'map': '地图',
+            'marker': '马克笔', 'matches': '火柴', 'megaphone': '扩音器', 'mermaid': '美人鱼',
+            'microphone': '麦克风', 'microwave': '微波炉', 'monkey': '猴子', 'moon': '月亮',
+            'mosquito': '蚊子', 'motorbike': '摩托车', 'mountain': '山', 'mouse': '老鼠',
+            'moustache': '胡须', 'mouth': '嘴巴', 'mug': '马克杯', 'mushroom': '蘑菇',
+            'nail': '钉子', 'necklace': '项链', 'nose': '鼻子', 'ocean': '海洋',
+            'octagon': '八边形', 'octopus': '章鱼', 'onion': '洋葱', 'oven': '烤箱',
+            'owl': '猫头鹰', 'paint can': '油漆桶', 'paintbrush': '画笔', 'palm tree': '棕榈树',
+            'panda': '熊猫', 'pants': '裤子', 'paper clip': '回形针', 'parachute': '降落伞',
+            'parrot': '鹦鹉', 'passport': '护照', 'peanut': '花生', 'pear': '梨',
+            'peas': '豌豆', 'pencil': '铅笔', 'penguin': '企鹅', 'piano': '钢琴',
+            'pickup truck': '皮卡车', 'picture frame': '相框', 'pig': '猪', 'pillow': '枕头',
+            'pineapple': '菠萝', 'pizza': '披萨', 'pliers': '钳子', 'police car': '警车',
+            'pond': '池塘', 'pool': '游泳池', 'popsicle': '冰棒', 'postcard': '明信片',
+            'potato': '土豆', 'power outlet': '电源插座', 'purse': '钱包', 'rabbit': '兔子',
+            'raccoon': '浣熊', 'radio': '收音机', 'rain': '雨', 'rainbow': '彩虹',
+            'rake': '耙子', 'remote control': '遥控器', 'rhinoceros': '犀牛', 'rifle': '步枪',
+            'river': '河流', 'roller coaster': '过山车', 'rollerskates': '旱冰鞋',
+            'sailboat': '帆船', 'sandwich': '三明治', 'saw': '锯子', 'saxophone': '萨克斯',
+            'school bus': '校车', 'scissors': '剪刀', 'scorpion': '蝎子', 'screwdriver': '螺丝刀',
+            'sea turtle': '海龟', 'see saw': '跷跷板', 'shark': '鲨鱼', 'sheep': '绵羊',
+            'shoe': '鞋子', 'shorts': '短裤', 'shovel': '铲子', 'sink': '水槽',
+            'skateboard': '滑板', 'skull': '骷髅', 'skyscraper': '摩天大楼',
+            'sleeping bag': '睡袋', 'smiley face': '笑脸', 'snail': '蜗牛', 'snake': '蛇',
+            'snorkel': '潜水面罩', 'snowflake': '雪花', 'snowman': '雪人',
+            'soccer ball': '足球', 'sock': '袜子', 'speedboat': '快艇', 'spider': '蜘蛛',
+            'spoon': '勺子', 'spreadsheet': '电子表格', 'square': '正方形', 'squiggle': '波浪线',
+            'squirrel': '松鼠', 'stairs': '楼梯', 'star': '星星', 'steak': '牛排',
+            'stereo': '音响', 'stethoscope': '听诊器', 'stitches': '缝针', 'stop sign': '停止标志',
+            'stove': '炉子', 'strawberry': '草莓', 'streetlight': '路灯', 'string bean': '四季豆',
+            'submarine': '潜水艇', 'suitcase': '行李箱', 'sun': '太阳', 'swan': '天鹅',
+            'sweater': '毛衣', 'swing set': '秋千', 'sword': '剑', 'syringe': '注射器',
+            't-shirt': 'T恤', 'table': '桌子', 'teapot': '茶壶', 'teddy-bear': '泰迪熊',
+            'telephone': '电话', 'television': '电视', 'tennis racquet': '网球拍',
+            'tent': '帐篷', 'The Eiffel Tower': '埃菲尔铁塔', 'The Great Wall of China': '中国长城',
+            'The Mona Lisa': '蒙娜丽莎', 'tiger': '老虎', 'toaster': '烤面包机',
+            'toe': '脚趾', 'toilet': '马桶', 'tooth': '牙齿', 'toothbrush': '牙刷',
+            'toothpaste': '牙膏', 'tornado': '龙卷风', 'tractor': '拖拉机',
+            'traffic light': '交通灯', 'train': '火车', 'tree': '树', 'triangle': '三角形',
+            'trombone': '长号', 'truck': '卡车', 'trumpet': '小号', 'umbrella': '雨伞',
+            'underwear': '内衣', 'van': '面包车', 'vase': '花瓶', 'violin': '小提琴',
+            'washing machine': '洗衣机', 'watermelon': '西瓜', 'waterslide': '水滑梯',
+            'whale': '鲸鱼', 'wheel': '轮子', 'windmill': '风车', 'wine bottle': '酒瓶',
+            'wine glass': '酒杯', 'wristwatch': '手表', 'yoga': '瑜伽', 'zebra': '斑马',
+            'zigzag': '锯齿线'
+        };
+
+        function translateCategory(cat) {
+            const lower = cat.toLowerCase();
+            return categoryTranslations[lower] || cat;
+        }
+
+        // Canvas 设置
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentTool = 'pen'; // 'pen' or 'eraser'
+        let brushSize = 6;
+
+        // 初始化 Canvas
+        function initCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            clearCanvas();
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 获取触摸/鼠标位置
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // 绘制
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = getPosition(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            
+            const pos = getPosition(e);
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            
+            if (currentTool === 'eraser') {
+                ctx.strokeStyle = 'white';
+            } else {
+                ctx.strokeStyle = '#333';
+            }
+            
+            ctx.lineWidth = brushSize;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing(e) {
+            if (e) e.preventDefault();
+            isDrawing = false;
+        }
+
+        // 事件绑定
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing, { passive: false });
+        canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+        // 阻止页面滚动
+        document.body.addEventListener('touchmove', (e) => {
+            if (e.target === canvas) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // 工具切换
+        document.getElementById('penBtn').addEventListener('click', () => {
+            currentTool = 'pen';
+            document.getElementById('penBtn').classList.add('active');
+            document.getElementById('eraserBtn').classList.remove('active');
+            canvas.classList.remove('eraser-mode');
+        });
+
+        document.getElementById('eraserBtn').addEventListener('click', () => {
+            currentTool = 'eraser';
+            document.getElementById('eraserBtn').classList.add('active');
+            document.getElementById('penBtn').classList.remove('active');
+            canvas.classList.add('eraser-mode');
+        });
+
+        // 画笔大小
+        document.getElementById('sizeSlider').addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            document.getElementById('sizeLabel').textContent = brushSize;
+        });
+
+        // 清除按钮
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            clearCanvas();
+            document.getElementById('results').innerHTML = 
+                '<div class="placeholder">在上方画板绘画后点击识别</div>';
+        });
+
+        // 识别按钮
+        document.getElementById('predictBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('predictBtn');
+            btn.classList.add('loading-state');
+            btn.disabled = true;
+
+            try {
+                const imageData = canvas.toDataURL('image/png');
+                
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.predictions.length > 0) {
+                    showResults(data.predictions);
+                } else {
+                    showError();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError();
+            } finally {
+                btn.classList.remove('loading-state');
+                btn.disabled = false;
+            }
+        });
+
+        // 显示结果
+        function showResults(predictions) {
+            const resultsDiv = document.getElementById('results');
+            const rankLabels = ['🥇', '🥈', '🥉', '4', '5'];
+            
+            let html = '<div class="results-title">🎯 识别结果</div>';
+            
+            predictions.forEach((pred, index) => {
+                const chineseName = translateCategory(pred.category);
+                html += `
+                    <div class="result-item">
+                        <div class="result-rank">${rankLabels[index]}</div>
+                        <span class="result-name">${chineseName}</span>
+                        <div class="result-bar">
+                            <div class="result-bar-fill" style="width: ${pred.confidence}%"></div>
+                        </div>
+                        <span class="result-conf">${pred.confidence}%</span>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function showError() {
+            document.getElementById('results').innerHTML = 
+                '<div class="placeholder">识别失败，请重试</div>';
+        }
+
+        // 初始化
+        window.addEventListener('load', initCanvas);
+        window.addEventListener('resize', initCanvas);
+    </script>
+</body>
+</html>

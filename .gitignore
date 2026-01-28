@@ -1,0 +1,37 @@
+# Quick Draw - Git 忽略文件
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 数据文件（太大，约3.5GB）
+data/
+*.npy
+
+# 调试文件
+debug_*.png
+*.log
+training_history*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*.tmp
+*.bak
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 评估结果（可选保留）
+# models/eval_results/

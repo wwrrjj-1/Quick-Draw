@@ -1,0 +1,33 @@
+# .dockerignore - 排除不需要的文件
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 数据文件（太大）
+data/
+*.npy
+
+# 调试文件
+debug_*.png
+*.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*.tmp
+*.bak

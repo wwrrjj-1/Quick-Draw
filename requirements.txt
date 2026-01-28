@@ -1,0 +1,16 @@
+# Quick Draw - CPU 部署版本依赖
+# 使用 PyTorch CPU 版本，减少包大小约 90%
+
+# Web 框架
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.6
+
+# 机器学习（CPU 版本）
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchvision>=0.15.0
+
+# 图像处理
+pillow>=9.0.0
+numpy>=1.24.0
